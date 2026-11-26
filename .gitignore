@@ -35,10 +35,11 @@ build/
 # Local database files
 data/
 
-# Secrets
+# Secrets — NEVER commit these
 .env
 .env.local
 .env.prod
+.env.production
 
 # OS
 .DS_Store
