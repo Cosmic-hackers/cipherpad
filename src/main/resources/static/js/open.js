@@ -32,10 +32,21 @@
   // Check if page was opened via shared link (has fragment)
   const fragment = parseFragment(window.location.hash);
   if (fragment.id && fragment.token) {
-    noteLinkInput.value = window.location.href;
-    if (sharedInfo) sharedInfo.style.display = 'flex';
+    // Shared link mode: show ONLY the password field
     const linkGroup = document.getElementById('linkGroup');
-    if (linkGroup) linkGroup.style.display = 'none';
+    const hintText  = document.getElementById('hintText');
+    const pageTitle = document.getElementById('pageTitle');
+    const pageDesc  = document.getElementById('pageDesc');
+    const pageEyebrow = document.getElementById('pageEyebrow');
+
+    if (linkGroup)    linkGroup.style.display    = 'none';
+    if (hintText)     hintText.style.display     = 'none';
+    if (pageEyebrow)  pageEyebrow.textContent    = 'Private note';
+    if (pageTitle)    pageTitle.innerHTML        = 'Enter your<br>password.';
+    if (pageDesc)     pageDesc.textContent       = 'This note is encrypted. Enter the password to decrypt and open it.';
+
+    // Pre-fill the hidden link field so extractIdAndToken still works if needed
+    noteLinkInput.value = window.location.href;
     passwordInput.focus();
   }
 
