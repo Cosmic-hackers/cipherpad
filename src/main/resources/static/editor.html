@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Editor — CipherPad</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔒</text></svg>"/>
+</head>
+<body class="editor-layout">
+
+<!-- UNLOCK OVERLAY — shown until note is decrypted -->
+<div id="unlockOverlay" class="modal-backdrop">
+  <div class="modal" style="max-width:440px;">
+    <div style="text-align:center; margin-bottom:1.25rem;">
+      <div style="font-size:2rem; margin-bottom:.5rem;">🔐</div>
+      <h2 class="modal-title" id="overlayTitle">Unlock Your Note</h2>
+      <p class="modal-desc" id="overlayDesc">Enter the encryption password to decrypt and open this note.</p>
+    </div>
+
+    <div class="form-stack">
+      <div class="form-group">
+        <label class="form-label" for="overlayPassword">Password</label>
+        <div class="input-wrapper">
+          <input
+            type="password"
+            id="overlayPassword"
+            class="form-input"
+            placeholder="Enter encryption password"
+            autocomplete="current-password"
+            autofocus
+          />
+          <button type="button" class="toggle-password" data-target="overlayPassword" aria-label="Toggle password visibility">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="eye-icon">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="overlayError" class="alert alert-error hidden" role="alert"></div>
+
+      <button id="overlayUnlockBtn" class="btn btn-primary btn-lg" style="width:100%;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+        Unlock Note
+      </button>
+
+      <div class="alert alert-info" style="font-size:.8125rem;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Decryption happens entirely in your browser. Your password is never sent over the network.</span>
+      </div>
+
+      <div style="text-align:center;">
+        <a href="/" class="btn btn-ghost btn-sm">← Back to home</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDITOR HEADER -->
+<header class="editor-header" id="editorHeader" style="display:none;">
+  <div class="editor-header-left">
+    <a href="/" class="editor-header-brand" title="Back to home">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+      <span class="visually-hidden">CipherPad</span>
+    </a>
+    <span style="color:var(--border); font-size:1.25rem; font-weight:300;">/</span>
+    <input
+      type="text"
+      id="titleInput"
+      class="editor-title-input"
+      placeholder="Untitled Note"
+      maxlength="200"
+      spellcheck="false"
+      aria-label="Note title"
+    />
+  </div>
+
+  <div class="editor-header-actions">
+    <!-- Save status -->
+    <div class="save-indicator" id="saveIndicator">
+      <div class="save-dot" id="saveDot"></div>
+      <span id="saveText">Saved</span>
+    </div>
+
+    <!-- Copy Link -->
+    <button id="copyLinkBtn" class="btn btn-ghost btn-sm" title="Copy shareable link">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      Copy Link
+    </button>
+
+    <!-- Copy Text -->
+    <button id="copyTextBtn" class="btn btn-ghost btn-sm" title="Copy decrypted text">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Copy Text
+    </button>
+
+    <!-- Lock -->
+    <button id="lockBtn" class="btn btn-secondary btn-sm" title="Lock and exit editor">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Lock
+    </button>
+
+    <!-- Delete -->
+    <button id="deleteBtn" class="btn btn-danger btn-sm" title="Delete this note permanently">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+      Delete
+    </button>
+  </div>
+</header>
+
+<!-- EDITOR BODY -->
+<main class="editor-body" id="editorBody" style="display:none;">
+  <textarea
+    id="noteContent"
+    class="editor-textarea"
+    placeholder="Start writing your private note here…&#10;&#10;Your content is encrypted before saving."
+    spellcheck="true"
+    aria-label="Note content"
+  ></textarea>
+
+  <div class="editor-footer">
+    <span class="char-counter" id="charCounter">0 characters</span>
+    <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
+      <span class="badge badge-teal" style="font-size:.7rem;">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        AES-256-GCM
+      </span>
+      <span style="font-size:.75rem; color:var(--text-muted);">Autosave every 2s</span>
+    </div>
+  </div>
+</main>
+
+<!-- DELETE CONFIRMATION MODAL -->
+<div id="deleteModal" class="modal-backdrop hidden">
+  <div class="modal">
+    <div style="font-size:2rem; text-align:center; margin-bottom:1rem;">⚠️</div>
+    <h3 class="modal-title" style="text-align:center;">Delete this note?</h3>
+    <p class="modal-desc" style="text-align:center;">This action is permanent and cannot be undone. Your encrypted note will be removed from our servers.</p>
+    <div class="modal-actions">
+      <button id="cancelDeleteBtn" class="btn btn-secondary">Cancel</button>
+      <button id="confirmDeleteBtn" class="btn btn-danger">Yes, Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- SHARE MODAL -->
+<div id="shareModal" class="modal-backdrop hidden">
+  <div class="modal" style="max-width:520px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+      <h3 class="modal-title">Share This Note</h3>
+      <button id="closeShareModal" class="btn btn-ghost btn-sm">✕</button>
+    </div>
+    <p class="modal-desc">Share this link with anyone who should read this note. They'll need the encryption password separately.</p>
+    <div class="share-box">
+      <code id="shareUrl"></code>
+      <button id="copyShareUrlBtn" class="btn btn-primary btn-sm" style="flex-shrink:0;">Copy</button>
+    </div>
+    <div class="alert alert-info" style="margin-top:1rem; font-size:.8125rem;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span><strong>Send the password separately.</strong> The link gives access to the encrypted data; the password is needed to decrypt it. Never share both together.</span>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+<script src="/js/crypto.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/editor.js"></script>
+</body>
+</html>

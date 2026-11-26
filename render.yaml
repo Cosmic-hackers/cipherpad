@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: cipherpad
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: PORT
+        value: 8080
+    healthCheckPath: /api/health
+    autoDeploy: true
