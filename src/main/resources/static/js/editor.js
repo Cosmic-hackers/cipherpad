@@ -290,7 +290,9 @@
   /*  Helpers                                                             */
   /* ------------------------------------------------------------------ */
   function showOverlayError(msg) {
-    overlayError.textContent = msg;
+    const span = document.getElementById('overlayErrorText');
+    if (span) span.textContent = msg;
+    else overlayError.textContent = msg;
     overlayError.classList.remove('hidden');
   }
 
