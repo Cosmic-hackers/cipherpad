@@ -1,139 +1,92 @@
 /**
  * CipherPad — open.js
- * Handles the "Open Note" page
+ * Password-only unlock page.
+ * Reads note id + token from the URL fragment (#id=...&token=...).
  */
 
 (async () => {
   'use strict';
 
   const form          = document.getElementById('openForm');
-  const noteLinkInput = document.getElementById('noteLink');
   const passwordInput = document.getElementById('unlockPassword');
   const unlockBtn     = document.getElementById('unlockBtn');
-  const sharedInfo    = document.getElementById('sharedLinkInfo');
+  const openTitle     = document.getElementById('openTitle');
+  const openDesc      = document.getElementById('openDesc');
 
-  // Error helpers (supports both old and new HTML structure)
+  /* ── Error helpers ─────────────────────────────────────── */
   function showError(msg) {
     const el   = document.getElementById('unlockError');
     const span = document.getElementById('unlockErrorText');
-    if (!el) return;
     if (span) span.textContent = msg;
-    else      el.textContent   = msg;
-    el.classList.remove('hidden');
-    el.style.display = 'flex';
+    if (el)   { el.style.display = 'flex'; }
   }
   function hideError() {
     const el = document.getElementById('unlockError');
-    if (!el) return;
-    el.classList.add('hidden');
-    el.style.display = 'none';
+    if (el) el.style.display = 'none';
   }
 
-  // Check if page was opened via shared link (has fragment)
+  /* ── Parse URL fragment ─────────────────────────────────── */
   const fragment = parseFragment(window.location.hash);
-  if (fragment.id && fragment.token) {
-    // Shared link mode: show ONLY the password field
-    const linkGroup = document.getElementById('linkGroup');
-    const hintText  = document.getElementById('hintText');
-    const pageTitle = document.getElementById('pageTitle');
-    const pageDesc  = document.getElementById('pageDesc');
-    const pageEyebrow = document.getElementById('pageEyebrow');
+  const noteId   = fragment.id    || null;
+  const token    = fragment.token || null;
 
-    if (linkGroup)    linkGroup.style.display    = 'none';
-    if (hintText)     hintText.style.display     = 'none';
-    if (pageEyebrow)  pageEyebrow.textContent    = 'Private note';
-    if (pageTitle)    pageTitle.innerHTML        = 'Enter your<br>password.';
-    if (pageDesc)     pageDesc.textContent       = 'This note is encrypted. Enter the password to decrypt and open it.';
-
-    // Pre-fill the hidden link field so extractIdAndToken still works if needed
-    noteLinkInput.value = window.location.href;
-    passwordInput.focus();
+  // No valid shared link — show helpful message and disable form
+  if (!noteId || !token) {
+    if (openTitle) openTitle.innerHTML = 'Invalid link.';
+    if (openDesc)  openDesc.textContent =
+      'This page requires a valid share link. Ask the note creator for the full link.';
+    unlockBtn.disabled = true;
+    unlockBtn.style.opacity = '.5';
+    unlockBtn.style.cursor  = 'not-allowed';
+    return;
   }
 
-  /* ------------------------------------------------------------------ */
-  /*  Parse various link formats                                          */
-  /* ------------------------------------------------------------------ */
-  function extractIdAndToken(input) {
-    input = input.trim();
-    try {
-      let url;
-      if (input.startsWith('http')) {
-        url = new URL(input);
-      } else if (input.includes('/editor.html')) {
-        url = new URL('http://x' + (input.startsWith('/') ? '' : '/') + input);
-      }
-      if (url) {
-        const params = parseFragment(url.hash);
-        if (params.id && params.token) return { id: params.id, token: params.token };
-      }
-    } catch (_) {}
+  // Auto-focus password
+  passwordInput.focus();
 
-    const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-    const match = input.match(uuidRegex);
-    if (match) return { id: match[0], token: null };
-    return null;
-  }
-
-  /* ------------------------------------------------------------------ */
-  /*  Form submit                                                         */
-  /* ------------------------------------------------------------------ */
+  /* ── Form submit ────────────────────────────────────────── */
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     hideError();
 
-    let noteId, token;
-
-    if (fragment.id && fragment.token) {
-      noteId = fragment.id;
-      token  = fragment.token;
-    } else {
-      const parsed = extractIdAndToken(noteLinkInput.value);
-      if (!parsed) {
-        showError('Invalid note link or ID. Please paste the full share link.');
-        return;
-      }
-      noteId = parsed.id;
-      token  = parsed.token;
-    }
-
-    const password = passwordInput.value;
+    const password = passwordInput.value.trim();
     if (!password) {
       showError('Please enter the decryption password.');
-      return;
-    }
-
-    if (!token) {
-      showError('No access token found in the link. Please paste the full share link (including the #id=…&token=… part).');
       return;
     }
 
     setLoading(true);
 
     try {
+      // Verify token against server and test decryption
       const pad = await PadAPI.getPad(noteId, token);
       await CipherPad.decrypt(pad.ciphertext, pad.salt, pad.iv, password);
+
+      // Success — save token and go to editor
       PadAPI.saveToken(noteId, token);
       window.location.href = `/editor.html#id=${noteId}&token=${encodeURIComponent(token)}`;
+
     } catch (err) {
       setLoading(false);
-      if (err.message && err.message.includes('Decryption failed')) {
-        showError('Wrong password — your note exists but could not be decrypted. Please try again.');
-      } else if (err.message && (err.message.includes('not found') || err.message.includes('token'))) {
-        showError('Note not found or invalid access token. The note may have been deleted.');
+      if (err.message && err.message.toLowerCase().includes('decrypt')) {
+        showError('Wrong password — could not decrypt. Please try again.');
+      } else if (err.message && (err.message.includes('404') || err.message.includes('not found'))) {
+        showError('Note not found or access denied. The note may have been deleted.');
       } else {
-        showError(err.message || 'Failed to load note. Please try again.');
+        showError(err.message || 'Failed to load note. Check your connection and try again.');
       }
     }
   });
 
-  function setLoading(loading) {
-    unlockBtn.disabled = loading;
-    unlockBtn.innerHTML = loading
+  /* ── Loading state ──────────────────────────────────────── */
+  function setLoading(on) {
+    unlockBtn.disabled = on;
+    unlockBtn.innerHTML = on
       ? '<div class="spinner"></div> Verifying…'
       : `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg> Unlock Note`;
   }
 
-  /* Password toggle */
+  /* ── Password show/hide ─────────────────────────────────── */
   document.querySelectorAll('.toggle-password').forEach(btn => {
     btn.addEventListener('click', () => {
       const inp = document.getElementById(btn.dataset.target);
@@ -148,4 +101,5 @@
       }
     });
   });
+
 })();
